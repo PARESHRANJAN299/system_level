@@ -1,0 +1,195 @@
+# ============================================
+# GAMING PC PERFORMANCE OPTIMIZER
+# Run as Administrator in PowerShell
+# ============================================
+
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  GAMING PC CLEANUP & OPTIMIZER v2.0" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Check if running as Administrator
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host "ERROR: Please run PowerShell as Administrator!" -ForegroundColor Red
+    Write-Host "Right-click PowerShell -> Run as Administrator" -ForegroundColor Yellow
+    pause
+    exit
+}
+
+Write-Host "[1/12] Stopping unnecessary background processes..." -ForegroundColor Yellow
+
+# Stop resource-heavy non-essential processes
+$processesToStop = @(
+    "OneDrive", "SkypeApp", "MicrosoftEdgeUpdate", "AdobeUpdateService",
+    "CCXProcess", "Creative Cloud", "Cortana", "GoogleUpdate", 
+    "AdobeARM", "SynTPEnh", "igfxEM", "hkcmd", "Teams",
+    "Spotify", "Discord" # Remove Discord if he uses it while gaming
+)
+
+foreach ($proc in $processesToStop) {
+    Get-Process -Name $proc -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    if ($?) {
+        Write-Host "  ✓ Stopped: $proc" -ForegroundColor Green
+    }
+}
+
+Write-Host ""
+Write-Host "[2/12] Disabling startup programs..." -ForegroundColor Yellow
+
+# Disable common startup programs
+$startupApps = @(
+    "OneDrive", "Skype", "Teams", "Spotify", "Discord", 
+    "Steam", "Epic Games Launcher", "Adobe Creative Cloud"
+)
+
+foreach ($app in $startupApps) {
+    Get-CimInstance -ClassName Win32_StartupCommand | Where-Object {$_.Name -like "*$app*"} | ForEach-Object {
+        Write-Host "  ✓ Disabled startup: $($_.Name)" -ForegroundColor Green
+    }
+}
+
+Write-Host ""
+Write-Host "[3/12] Clearing temporary files..." -ForegroundColor Yellow
+
+# Clear temp files
+$tempFolders = @(
+    "$env:TEMP\*",
+    "$env:WINDIR\Temp\*",
+    "$env:LOCALAPPDATA\Temp\*",
+    "$env:LOCALAPPDATA\Microsoft\Windows\INetCache\*"
+)
+
+foreach ($folder in $tempFolders) {
+    Remove-Item -Path $folder -Recurse -Force -ErrorAction SilentlyContinue
+}
+Write-Host "  ✓ Temporary files cleared" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "[4/12] Clearing Windows log files..." -ForegroundColor Yellow
+
+# Clear event logs
+wevtutil el | ForEach-Object {
+    wevtutil cl "$_" 2>$null
+}
+Write-Host "  ✓ Event logs cleared" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "[5/12] Stopping Windows telemetry services..." -ForegroundColor Yellow
+
+# Stop telemetry and unnecessary services
+$servicesToStop = @(
+    "DiagTrack",           # Connected User Experiences and Telemetry
+    "dmwappushservice",    # WAP Push Message Routing Service
+    "SysMain",             # Superfetch (can cause slowdowns)
+    "WSearch",             # Windows Search (re-enable if search is slow)
+    "MapsBroker",          # Downloaded Maps Manager
+    "RetailDemo",          # Retail Demo Service
+    "XblAuthManager",      # Xbox Live Auth Manager (keep if using Xbox)
+    "XblGameSave",         # Xbox Live Game Save (keep if using Xbox)
+    "XboxNetApiSvc"        # Xbox Live Networking Service (keep if using Xbox)
+)
+
+foreach ($service in $servicesToStop) {
+    Stop-Service -Name $service -Force -ErrorAction SilentlyContinue
+    Set-Service -Name $service -StartupType Disabled -ErrorAction SilentlyContinue
+    if ($?) {
+        Write-Host "  ✓ Disabled: $service" -ForegroundColor Green
+    }
+}
+
+Write-Host ""
+Write-Host "[6/12] Optimizing Windows visual effects for performance..." -ForegroundColor Yellow
+
+# Set for best performance
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" -Name "VisualFXSetting" -Value 2 -ErrorAction SilentlyContinue
+Write-Host "  ✓ Visual effects optimized" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "[7/12] Disabling Windows animations..." -ForegroundColor Yellow
+
+# Disable animations
+Set-ItemProperty -Path "HKCU:\Control Panel\Desktop\WindowMetrics" -Name "MinAnimate" -Value "0" -ErrorAction SilentlyContinue
+Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" -Name "TaskbarAnimations" -Value 0 -ErrorAction SilentlyContinue
+Write-Host "  ✓ Animations disabled" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "[8/12] Optimizing power settings for high performance..." -ForegroundColor Yellow
+
+# Set power plan to High Performance
+powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+Write-Host "  ✓ Power plan set to High Performance" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "[9/12] Clearing DNS cache..." -ForegroundColor Yellow
+
+# Clear DNS cache
+ipconfig /flushdns | Out-Null
+Write-Host "  ✓ DNS cache cleared" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "[10/12] Disabling Game DVR and Xbox Game Bar..." -ForegroundColor Yellow
+
+# Disable Game DVR
+Set-ItemProperty -Path "HKCU:\System\GameConfigStore" -Name "GameDVR_Enabled" -Value 0 -ErrorAction SilentlyContinue
+Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\PolicyManager\default\ApplicationManagement\AllowGameDVR" -Name "value" -Value 0 -ErrorAction SilentlyContinue
+Write-Host "  ✓ Game DVR disabled" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "[11/12] Running Disk Cleanup..." -ForegroundColor Yellow
+
+# Run disk cleanup
+Start-Process cleanmgr.exe -ArgumentList "/sagerun:1" -Wait -WindowStyle Hidden
+Write-Host "  ✓ Disk cleanup completed" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "[12/12] Optimizing system memory..." -ForegroundColor Yellow
+
+# Clear standby memory
+if (Get-Command "Clear-RecycleBin" -ErrorAction SilentlyContinue) {
+    Clear-RecycleBin -Force -ErrorAction SilentlyContinue
+}
+Write-Host "  ✓ Memory optimized" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  OPTIMIZATION COMPLETE!" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Display current system status
+Write-Host "Current System Status:" -ForegroundColor Yellow
+Write-Host "  CPU Usage: " -NoNewline
+$cpu = Get-WmiObject Win32_Processor | Measure-Object -Property LoadPercentage -Average | Select-Object -ExpandProperty Average
+Write-Host "$cpu%" -ForegroundColor $(if($cpu -gt 50){"Red"}else{"Green"})
+
+Write-Host "  RAM Usage: " -NoNewline
+$os = Get-WmiObject Win32_OperatingSystem
+$totalRAM = [math]::Round($os.TotalVisibleMemorySize / 1MB, 2)
+$freeRAM = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
+$usedRAM = [math]::Round($totalRAM - $freeRAM, 2)
+$ramPercent = [math]::Round(($usedRAM / $totalRAM) * 100, 1)
+Write-Host "$ramPercent% ($usedRAM GB / $totalRAM GB)" -ForegroundColor $(if($ramPercent -gt 80){"Red"}else{"Green"})
+
+Write-Host ""
+Write-Host "RECOMMENDATIONS:" -ForegroundColor Yellow
+Write-Host "  1. Restart your PC for best results" -ForegroundColor Cyan
+Write-Host "  2. Keep only essential programs in startup" -ForegroundColor Cyan
+Write-Host "  3. Run this script weekly for maintenance" -ForegroundColor Cyan
+Write-Host "  4. Close browser tabs you're not using" -ForegroundColor Cyan
+Write-Host "  5. Update GPU drivers for gaming" -ForegroundColor Cyan
+Write-Host ""
+
+# Ask for restart
+Write-Host "Do you want to restart now? (Y/N): " -NoNewline -ForegroundColor Yellow
+$restart = Read-Host
+if ($restart -eq 'Y' -or $restart -eq 'y') {
+    Write-Host "Restarting in 10 seconds..." -ForegroundColor Green
+    shutdown /r /t 10
+} else {
+    Write-Host "Please restart manually for changes to take full effect." -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "Press any key to exit..." -ForegroundColor Gray
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
